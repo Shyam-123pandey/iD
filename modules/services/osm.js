@@ -78,7 +78,7 @@ var _rateLimitError;
 var _userChangesets;
 var _userDetails;
 var _off;
-var MAX_SUBDIVISION_DEPTH = 3;
+var _maxSubdivisionDepth = 3;
 var _isLoading = false;
 
 // set a default but also load this from the API status
@@ -1214,39 +1214,19 @@ export default {
         delete _tileCache.inflight[tile.id];
         delete _tileCache.toLoad[tile.id];
 
-        if (depth < MAX_SUBDIVISION_DEPTH) {
-          var extentObj = tile.extent.bbox();
-          var minLon = extentObj.minX;
-          var minLat = extentObj.minY;
-          var maxLon = extentObj.maxX;
-          var maxLat = extentObj.maxY;
+        if (depth < _maxSubdivisionDepth) {
+          var quadrants = tile.extent.split();
 
-          var midLon = (minLon + maxLon) / 2;
-          var midLat = (minLat + maxLat) / 2;
+          quadrants.forEach(function(extent, i) {
 
-          var boxes = [
-            [minLon, minLat, midLon, midLat],
-            [midLon, minLat, maxLon, midLat],
-            [minLon, midLat, midLon, maxLat],
-            [midLon, midLat, maxLon, maxLat],
-          ];
+              var childTile = {
+                  id: tile.id + '-' + depth + '-' + i,
+                  extent: extent
+              };
 
-          boxes.forEach((bboxArr, i) => {
-            var childTile = {
-              id: tile.id + "-" + depth + "-" + i,
-              extent: {
-                toParam: () => bboxArr.join(","),
-                bbox: () => ({
-                  minX: bboxArr[0],
-                  minY: bboxArr[1],
-                  maxX: bboxArr[2],
-                  maxY: bboxArr[3],
-                }),
-              },
-            };
+              this.loadTile(childTile, callback, depth + 1);
 
-            this.loadTile(childTile, callback, depth + 1);
-          });
+          }.bind(this));
 
           return;
         }
@@ -1280,6 +1260,7 @@ export default {
         delete _tileCache.inflight[tile.id];
 
         setTimeout(() => {
+          // retry loading the tiles
           this.loadTile(tile, callback, depth);
         }, 8000);
 
